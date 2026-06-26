@@ -32,7 +32,7 @@ def script_properties():
         "seed_number",
         "Seed",
         1,
-        7,
+        10,
         1
     )
     obs.obs_properties_add_int(
@@ -40,7 +40,7 @@ def script_properties():
         "week_number",
         "Week",
         1,
-        7,
+        999999,
         1
     )
 
@@ -195,7 +195,6 @@ def set_seed(s):
 
     obs.obs_source_release(scene_source)
 
-
 def script_update(settings):
     global comm1id, comm2id, comm1name, comm2name, comm1nameo, comm2nameo
     league = obs.obs_data_get_int(settings, "league_number")
@@ -211,7 +210,26 @@ def script_update(settings):
     edit_text(f'League {league}', 'League')
     edit_text(f'Seed {seed}', 'Seed')
     edit_text(f'Week {week}', 'Week numer')
+    update_lbs(week, league)
     set_seed(seedtype)
+
+def update_lbs(week, league):
+    source = obs.obs_get_source_by_name('Big Leaderboard')
+    if not source:
+        return
+    d = obs.obs_data_create()
+    obs.obs_data_set_string(d, "url", f'https://mscl.pages.dev/week/?week={week}&league={league}')
+    obs.obs_source_update(source, d)
+    obs.obs_data_release(d)
+    obs.obs_source_release(source)
+    source = obs.obs_get_source_by_name('MATCH WINNER')
+    if not source:
+        return
+    d = obs.obs_data_create()
+    obs.obs_data_set_string(d, "url", f'https://mscl.pages.dev/week/?week={week}&league={league}')
+    obs.obs_source_update(source, d)
+    obs.obs_data_release(d)
+    obs.obs_source_release(source)
 
 def getpfp(url, name):
     global downloads
