@@ -17,9 +17,9 @@ LEADERBOARD
 Testing
  - Tools > Scripts
  - python settings
-  > set location to where python is installed
-  > recommend 3.11
-  > if you downloaded it from the microsoft store you have to uninstall and get from the installer from the website 
+   + set location to where python is installed
+   + recommend 3.11
+   + if you downloaded it from the microsoft store you have to uninstall and get from the installer from the website 
  - run `py -m pip install requests pillow` in CMD
  - import 'mcrlobsscript.py'
  - test league, seed, week and seed type
