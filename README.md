@@ -1,20 +1,20 @@
-COMMENTATORS
+### COMMENTATORS Scene
  - new image -> 'commimg1'
  - new image -> 'commimg2'
  - rename 'comm 2' to 'comm2'
  - copy 'League' to clipboard
 
-INTERMISSION
+### INTERMISSION Scene
  - paste 'League'
  - put it over the existing league counter
  - delete the 'League #'
 
-LEADERBOARD
+### LEADERBOARD Scene
  - paste 'League'
  - put it over the existing league counter
  - delete the 'League #'
 
-Testing
+### Testing
  - Tools > Scripts
  - python settings
    + set location to where python is installed
