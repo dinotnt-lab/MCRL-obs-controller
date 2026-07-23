@@ -1,30 +1,32 @@
 ### COMMENTATORS Scene
- - new image -> 'commimg1'
- - new image -> 'commimg2'
- - rename 'comm 2' to 'comm2'
- - copy 'League' to clipboard
+ - New image -> 'commimg1'
+ - New image -> 'commimg2'
+ - Rename 'comm 2' to 'comm2'
+ - Copy 'League' to clipboard
 
 ### INTERMISSION Scene
- - paste 'League'
- - put it over the existing league counter
- - delete the 'League #'
+ - Paste 'League'
+ - Put it over the existing league counter
+ - Delete the 'League #'
 
 ### LEADERBOARD Scene
- - paste 'League'
- - put it over the existing league counter
- - delete the 'League #'
+ - Paste 'League'
+ - Put it over the existing league counter
+ - Delete the 'League #'
 
 ### Testing
  - Tools > Scripts
- - python settings
-   + set location to where python is installed
-   + recommend 3.11
-   + if you downloaded it from the microsoft store you have to uninstall and get from the installer from the website 
- - run `py -m pip install requests pillow` in CMD
- - import 'mcrlobsscript.py'
- - test league, seed, week and seed type
- - Put in a Discord ID (e.g. 1180267018696536074)
- - enter anything into override
- - clear commentators
+ - Python settings
+   + Set location to where python is installed
+   + Recommend 3.11
+   + If you downloaded it from the microsoft store you have to uninstall and get from the installer from the website 
+ - Run `py -m pip install requests pillow discord obsws_python` in CMD
+ - Import 'mcrlobsscript.py' to obs
+ - Test league, seed, week and seed type
+ - Input discord bot script file path
+ - Launch bot
+ - Login to bot successfully
+ - Connect to obs successfully
+ - Try /set-commentators and /set-name-overrides
 
-if anything went wrong please let me know (it usually shows a log window so send that too) > @dinotnt
+If anything went wrong please let me know (it usually shows a log window so send that too) > @dinotnt
