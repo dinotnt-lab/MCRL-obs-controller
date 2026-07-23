@@ -136,10 +136,10 @@ async def obs_connect(interaction: discord.Interaction, password: str | None = N
             await interaction.followup.send(f'Error: `{e}`')
         return
 
-    await interaction.followup.send("Successfully connected to OBS, now /set-commentators")
+    await interaction.followup.send("Successfully connected to OBS, now /set-commentators or /set-name-overrides")
     os.system('cls')
     print('Successfully connected to OBS')
-    print('Use /set-commentators in #streamBot')
+    print('Use /set-commentators or /set-name-overrides in #streamBot')
     print('Happy Streaming :)')
 
 @bot.event
@@ -163,12 +163,12 @@ async def on_ready():
         obs = obsws_python.ReqClient(host="localhost", port=4455, timeout=5)
         os.system('cls')
         print('Successfully connected to OBS')
-        print('Use /set-commentators in #streamBot')
+        print('Use /set-commentators or /set-name-overrides in #streamBot')
         print('Happy Streaming :)')
         
     except:
         os.system('cls')
-        print('Could not automatically connect to obs, please run /obs-connect to fix')
+        print('Could not automatically connect to obs, please run /obs-connect to fix in #streamBot')
 
 while True:
     if os.path.isfile(token_file):
