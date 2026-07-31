@@ -367,7 +367,7 @@ def updatesplits():
         return
 
     if tabs.get() != 'Streams':
-        app.after(1000, updatesplits)
+        app.after(2000, updatesplits)
         return
 
     run_thread(fetch_splits)
@@ -504,7 +504,7 @@ def fetch_splits():
         app.after(0, lambda: update_status_label.configure(text=str(e)))
 
     finally:
-        app.after(1000, updatesplits)
+        app.after(2000, updatesplits)
 
 def tab_changed():
     global split_updating
