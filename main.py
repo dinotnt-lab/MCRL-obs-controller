@@ -18,7 +18,7 @@ downloads = Path.home() / 'downloads'
 try:
     with open('settings.json', 'r') as f:
         settings = json.load(f)
-except json.JSONDecodeError:
+except FileNotFoundError:
     settings = {}
 
 app = ctk.CTk()
@@ -113,7 +113,7 @@ def loadplayerfile():
 def connectobs():
     global obs
     try:
-        obs = obsws_python.ReqClient(host="localhost", port=4455, password=obs_password_entry.get(), timeout=5)
+        obs = obsws_python.ReqClient(host="localhost", port=4455, password=obs_password_entry.get(), timeout=3)
         obs_status.configure(text = 'Success')
         obs_button.configure(fg_color='green', hover_color='dark green', state='disabled')
 
