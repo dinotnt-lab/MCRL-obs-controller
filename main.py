@@ -727,7 +727,7 @@ setup_tab = tabs.add("Setup")
 advanced_tab = tabs.add("Advanced Settings")
 streams_tab = tabs.add("Streams")
 
-# region Setup tab
+d# region Setup tab
 file_frame = ctk.CTkFrame(setup_tab)
 file_frame.pack(fill="x", padx=20, pady=2)
 file_label = ctk.CTkLabel(file_frame, text="Player File:")
@@ -910,3 +910,5 @@ app.mainloop()
 ## Todo
 # - chat -> inv button
 # - set names of elements so obs doesnt have to be right
+# - set settings location to appdata
+# - seeds
