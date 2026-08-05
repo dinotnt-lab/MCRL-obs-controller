@@ -10,13 +10,23 @@ import obsws_python
 import requests
 from PIL import Image, ImageDraw
 from tkinter import filedialog
+import os
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-ROOT_DIR = Path(__file__).resolve().parent
-DOWNLOADS_DIR = Path.home() / "downloads"
-SETTINGS_PATH = ROOT_DIR / "settings.json"
+if os.name == "nt":
+    APPDATA_DIR = Path(os.getenv("APPDATA")) / "MCRL OBS Tool"
+else:
+    APPDATA_DIR = Path.home() / ".config" / "MCRL OBS Tool"
+
+APPDATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DOWNLOADS_DIR = Path.home() / "Downloads"
+SETTINGS_PATH = APPDATA_DIR / "settings.json"
+
+if os.path.isfile(Path(__file__).resolve().parent / 'settings.json'):
+    os.rename(Path(__file__).resolve().parent / 'settings.json', SETTINGS_PATH)
 
 try:
     with SETTINGS_PATH.open("r", encoding="utf-8") as handle:
@@ -25,12 +35,8 @@ except FileNotFoundError:
     settings = {}
 
 app = ctk.CTk()
-app.geometry("1000x640")
+app.geometry("750x600")
 app.title("MCRL OBS Tool")
-app.after(100, lambda: app.wm_attributes("-alpha", 0.99))
-app.after(150, lambda: app.wm_attributes("-alpha", 1.0))
-
-UPDATE_INTERVAL_MS = 2000
 
 streamingplayerlist = []
 obs = None
@@ -41,6 +47,7 @@ selectedspotelement = None
 split_updating = False
 poll_generation = 0
 said_started = False
+said_done = False
 shown = {}
 done = []
 uuid_to_streamer = {}
@@ -93,15 +100,17 @@ def validate_league(value):
 def validate_number(value):
     return value == "" or value.isdigit()
 
+def validate_seed_count(value):
+    if value.isdigit():
+        if 0 < int(value) < 9:
+            return True
+    if value == '':
+        return True
+    return False
 
 validate_league_cmd = app.register(validate_league)
 validate_number_cmd = app.register(validate_number)
-
-
-def set_info_text(message):
-    if "info_label" in globals():
-        info_label.configure(text=message)
-
+validate_seed_count_cmd = app.register(validate_seed_count)
 
 def safe_obs_set(source, payload):
     if obs is None:
@@ -110,11 +119,11 @@ def safe_obs_set(source, payload):
         obs.set_input_settings(source, payload, True)
         return True
     except Exception as exc:
-        if "update_status_label" in globals():
-            if 'No Source was found by the name' in str(exc):
-                update_status_label.configure(text=f"OBS error: Check scene collection and element names are correct")
-            update_status_label.configure(text=f"OBS error: {exc}")
-        return False
+        if 'No source was found by the name' in str(exc):
+            save_status_label.configure(text=f"OBS error: Check scene collection and element names are correct", text_color="red")
+        else:
+            save_status_label.configure(text=f"OBS error: {exc}", text_color="red")
+    return False
 
 
 def run_thread(function):
@@ -134,13 +143,13 @@ def get_player_avatar(player):
 
     try:
         response = requests.get(
-            f"https://nmsr.nickac.dev/face/{player['ign']}",
+            f"https://minotar.net/avatar/{player['ign']}/32",
             timeout=1,
         )
         response.raise_for_status()
 
         img = Image.open(BytesIO(response.content)).convert("RGBA").resize(
-            (48, 48),
+            (32, 32),
             Image.Resampling.LANCZOS,
         )
         avatar = ctk.CTkImage(img)
@@ -251,11 +260,11 @@ def loadplayerfile():
             file_status_label.configure(text=f"{index}/{len(streamingplayerlist)} streamers loaded")
             app.update()
 
-        file_status_label.configure(text=f"Loaded {len(streamingplayerlist)} streamers")
+        file_status_label.configure(text=f"Loaded {len(streamingplayerlist)} streamers", text_color="green")
         playerlistbutton.configure(fg_color="green", hover_color="dark green")
-        updateobs()
+        savesetup()
     except Exception as exc:
-        file_status_label.configure(text=str(exc))
+        file_status_label.configure(text=str(exc), text_color="red")
 
 
 def connectobs():
@@ -268,66 +277,91 @@ def connectobs():
             password=obs_password_entry.get(),
             timeout=3,
         )
-        obs_status.configure(text="Success")
+        obs_status.configure(text="Success", text_color="green")
         obs_button.configure(fg_color="green", hover_color="dark green", state="disabled")
     except ConnectionRefusedError:
         obs = None
         obs_status.configure(
-            text="OBS websockets not enabled or port changed (return to default). Tools > Websocket Server Settings"
+            text="OBS websockets not enabled or port changed (return to default). Tools > Websocket Server Settings",
+            text_color="red"
         )
     except Exception as exc:
         obs = None
         error = str(exc).lower()
         if "password" in error or "failed" in error:
-            obs_status.configure(text="Incorrect or missing password")
+            obs_status.configure(text="Incorrect or missing password", text_color="red" )
         else:
-            obs_status.configure(text=f"Error: {exc}")
+            obs_status.configure(text=f"Error: {exc}", text_color="red")
 
 
-def updateobs():
+def savesetup():
     global setup_complete
+    try:
+        if not streamingplayerlist:
+            save_status_label.configure(text="Missing Player File", text_color="red")
+            return
+        if not bot_entry.get():
+            save_status_label.configure(text="Missing Discord Bot Token", text_color="red")
+            return
+        if not api_entry.get():
+            save_status_label.configure(text="Missing MCSR API Key", text_color="red")
+            return
+        if not ign_entry.get():
+            save_status_label.configure(text="Missing MCSR ign", text_color="red")
+            return
+        if obs is None:
+            save_status_label.configure(text="OBS not connected", text_color="red")
+            return
 
-    if not streamingplayerlist:
-        update_status_label.configure(text="Missing Player File")
-        return
-    if not bot_entry.get():
-        update_status_label.configure(text="Missing Discord Bot Token")
-        return
-    if not api_entry.get():
-        update_status_label.configure(text="Missing MCSR API Key")
-        return
-    if not ign_entry.get():
-        update_status_label.configure(text="Missing MCSR ign")
-        return
-    if obs is None:
-        update_status_label.configure(text="OBS not connected")
-        return
+        settings["obs_password"] = obs_password_entry.get()
+        settings["ranked_api_key"] = api_entry.get()
+        settings["discord_token"] = bot_entry.get()
+        settings["ign"] = ign_entry.get()
+        save_settings()
 
-    settings["obs_password"] = obs_password_entry.get()
-    settings["ranked_api_key"] = api_entry.get()
-    settings["discord_token"] = bot_entry.get()
-    settings["ign"] = ign_entry.get()
-    save_settings()
+        dc = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bot {settings.get('discord_token', '')}"})
+        if dc.status_code != 200:
+            save_status_label.configure(text="Invalid Discord Bot Token", text_color="red")
+            return
+        
+        mcsr = requests.get(f"https://api.mcsrranked.com/users/{settings.get('ign')}/live", headers={"Private-Key": settings.get("ranked_api_key")})
+        if mcsr.status_code == 400:
+            if mcsr.json().get('data').get('headers', {}).get('Private-Key') == 'Private key is incorrect.':
+                save_status_label.configure(text="Invalid MCSR API Key", text_color="red")
+                return
+            if mcsr.json().get('data').get('error') == 'User is not exists.':
+                save_status_label.configure(text="Invalid MCSR ign", text_color="red")
+                return
+            if mcsr.json().get('data').get('error') == 'Player is not online.':
+                save_status_label.configure(text="You are not online - can continue", text_color="gray")
+        elif mcsr.status_code != 200:
+            save_status_label.configure(text=f"MCSR API error: {mcsr.json()}", text_color="red")
+            return
 
-    safe_obs_set("League", {"text": f"League {league_entry.get()}", "font_size": 30})
-    safe_obs_set("Week", {"text": f"Week {week_entry.get()}", "font_size": 30})
-    safe_obs_set("Seed", {"text": f"Seed {seed_entry.get()}", "font_size": 30})
+        if not safe_obs_set("League", {"text": f"League {league_entry.get()}", "font_size": 30}):
+            save_button.configure(fg_color="red")
+            return
+        safe_obs_set("Week", {"text": f"Week {week_entry.get()}", "font_size": 30})
+        safe_obs_set("Seed", {"text": f"Seed {seed_entry.get()}", "font_size": 30})
 
-    for source in ["Big Leaderboard", "MATCH WINNER", "lb"]:
-        safe_obs_set(
-            source,
-            {
-                "url": f"https://mscl.pages.dev/week/?week={week_entry.get()}&league={league_entry.get()}"
-            }
-        )
+        for source in ["Big Leaderboard", "MATCH WINNER", "lb"]:
+            safe_obs_set(
+                source,
+                {
+                    "url": f"https://mscl.pages.dev/week/?week={week_entry.get()}&league={league_entry.get()}"
+                }
+            )
 
-    run_thread(commentators_thread)
-    safe_obs_set("comm1", {"text": comm1_name_entry.get()})
-    safe_obs_set("comm2", {"text": comm2_name_entry.get()})
+        run_thread(commentators_thread)
+        safe_obs_set("comm1", {"text": comm1_name_entry.get()})
+        safe_obs_set("comm2", {"text": comm2_name_entry.get()})
+        fetch_obs_data()
 
-    setup_complete = True
-    update_button.configure(fg_color="green", hover_color="dark green")
-    update_status_label.configure(text="OBS updated")
+        setup_complete = True
+        save_button.configure(fg_color="green", hover_color="dark green")
+        save_status_label.configure(text="OBS saved", text_color="green")
+    except Exception as exc:
+        save_status_label.configure(text=f"Error: {exc}", text_color="red")
 
 
 def discord_user_info(user_id):
@@ -411,7 +445,70 @@ def commentators_thread():
             app.after(0, lambda: comm2_name_entry.insert(0, name))
             safe_obs_set("commimg2", {"file": filepath})
     except Exception as exc:
-        app.after(0, lambda: update_status_label.configure(text=str(exc)))
+        app.after(0, lambda: save_status_label.configure(text=str(exc), text_color="red"))
+
+seed_count = 5
+seed_entries = []
+seed_elements = []
+
+def open_seed_menu():
+    seed_window = ctk.CTkToplevel(app)
+    seed_window.grab_set()
+    seed_window.title("Seed Menu")
+    seed_window.geometry("200x400")
+
+    count_frame = ctk.CTkFrame(seed_window)
+    count_frame.pack(fill="x", pady=5, padx=5)
+    count_label = ctk.CTkLabel(count_frame, text="Seed Count:")
+    count_label.pack(side="left", pady=5, padx=5)
+    count_entry = ctk.CTkEntry(count_frame, validate="key", validatecommand=(validate_seed_count_cmd, "%P"))
+    count_entry.pack(side="right", pady=5, padx=5)
+    count_entry.insert(0, str(seed_count))
+
+    seeds_frame = ctk.CTkScrollableFrame(seed_window)
+    seeds_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+    def build_seed_entries(*_):
+        global seed_count
+
+        text = count_entry.get()
+        if not text:
+            return
+
+        seed_count = int(text)
+
+        for widget in seeds_frame.winfo_children():
+            widget.destroy()
+
+        seed_entries.clear()
+        seed_elements.clear()
+
+        for i in range(seed_count):
+            row = ctk.CTkFrame(seeds_frame, fg_color="transparent")
+            row.pack(fill="x", padx=5, pady=3)
+
+            label = ctk.CTkLabel(row, text=f"Seed {i + 1}", width=70, anchor="w")
+            label.pack(side="left")
+
+            menu = ctk.CTkOptionMenu(row, values=["BT", "DT", "VILLAGE", "RP", "SHIP"])
+            menu.pack(side="right", fill="x", expand=True)
+
+            seed_elements.append(menu)
+            seed_entries.append(menu.get())
+
+            def save(index, value, element):
+                seed_entries.__setitem__(index, value)
+                element.configure(fg_color='green')
+                seed_window.after(1000, lambda: element.configure(fg_color='#1f6aa5'))
+                update_seed()
+
+            menu.configure(command=lambda value, index=i, element=menu: save(index, value, element))
+        
+        seed_window.geometry(f'200x{(seed_count + 1) * 40}')
+
+    count_entry.bind("<KeyRelease>", build_seed_entries)
+    
+    build_seed_entries()
 
 
 def selectstream(player):
@@ -463,7 +560,7 @@ def selectspot(spot, element):
         )
         safe_obs_set(f"pov{spot}", {"url": url})
         safe_obs_set(f"pov{spot}name", {"text": selectedstream["displayname"]})
-        safe_obs_set(f"headpov{spot}", {"url": f'https://nmsr.nickac.dev/face/{selectedstream["ign"]}'})
+        safe_obs_set(f"headpov{spot}", {"url": f'https://minotar.net/avatar/{selectedstream["ign"]}'})
 
         set_view_button_display(element, selectedstream)
         element.configure(fg_color="#1f6aa5")
@@ -544,6 +641,66 @@ def clear():
     selectedspotelement = None
 
 
+def refresh():
+    global selectedspot, selectedspotelement
+
+    if selectedspot is None:
+        return
+
+    obs.press_input_properties_button(
+        input_name=f"pov{selectedspot}", prop_name="refreshnocache"
+    )
+
+    selectedspot = None
+    selectedspotelement.configure(fg_color='#1f6aa5')
+    selectedspotelement = None
+
+
+def chat_inv_toggle():
+    if not settings.get('inv_file'):
+        if obs.get_input_settings('items').input_settings.get('local_file') != '':
+            msg = CTkMessagebox.CTkMessagebox(title='Inv File', message=f'Is "{obs.get_input_settings("items").input_settings.get("local_file")}" your inventory tracker file location?', option_1="No", option_2="Yes")
+            response = msg.get()
+            if response == 'Yes':
+                settings['inv_file'] = obs.get_input_settings('items').input_settings.get('local_file')
+                save_settings()
+            else:
+                chat_inv_button.configure(text='No inv file set', fg_color='red')
+        app.after(2000, lambda: chat_inv_button.configure(text='Chat -> Inventory', fg_color='#1f6aa5'))
+        return
+    
+    obs.set_input_settings('items', {'url': settings.get('chat_url')}, True)
+    obs.set_input_settings('items', {'local_file': settings.get('inv_file')}, True)
+
+    chat = obs.get_input_settings('items').input_settings.get('is_local_file', False)
+    obs.set_input_settings('items', {'is_local_file': not chat}, True)
+
+    if chat:
+        chat_inv_button.configure(text='Chat -> Inventory', fg_color='#1f6aa5')
+    else:
+        chat_inv_button.configure(text='Inventory -> Chat', fg_color='#1f6aa5')
+
+
+def fetch_obs_data():
+    view_buttons = [
+        view_1_button,
+        view_2_button,
+        view_3_button,
+        view_4_button
+    ]
+
+    for i in range(4):
+        a = obs.get_input_settings(f'pov{i + 1}').input_settings.get('url', '')
+        a = a.replace(
+            "https://player.twitch.tv/?channel=", ""
+        ).replace(
+            "&enableExtensions=true&muted=false&parent=twitch.tv&player=popout&quality=chunked&volume=0",
+            "",
+        )
+        streamer = find_streamer_by_twitch(a)
+        set_view_button_display(view_buttons[i], streamer)
+    
+
 def reorder_streamer_buttons():
     sorted_players = sorted(
         streamingplayerlist,
@@ -561,7 +718,7 @@ def reorder_streamer_buttons():
 
 
 def update_splits_display(data):
-    global info_lines, players_in_room, uuid_to_streamer, shown, done, said_started
+    global info_lines, players_in_room, uuid_to_streamer, shown, done, said_started, said_done, auto_seed
 
     if data.get("status") == "error":
         CTkMessagebox.CTkMessagebox(
@@ -642,8 +799,38 @@ def update_splits_display(data):
             if streamer and streamer.get("frame") is not None:
                 streamer["frame"].pack_forget()
                 streamer["element"].configure(text=f"{streamer['ign']}\nCompleted")
+    elif status == 'done' and not said_done:
+        said_done = True
+        info_lines = info_lines[1:] + ["Match Completed"]
+        if auto_seed:
+            x = int(seed_entry.get())
+            seed_entry.set(x + 1)
+            update_seed()
 
     info_label.configure(text="\n".join(info_lines))
+
+
+def update_seed():
+    seed = int(seed_entry.get())
+    _type = seed_entries[seed - 1]
+    obs.set_input_settings('Seed', {'text': 'Seed ' + str(seed)}, True)
+    for i in ["BT", "DT", "VILLAGE", "RP", "SHIP"]:
+        item_id = obs.get_scene_item_id(
+            scene_name='Seed Type',
+            source_name=i
+        ).scene_item_id
+        if i == _type:
+            obs.set_scene_item_enabled(
+                scene_name='Seed Type',
+                item_id=item_id,
+                enabled=True
+            )
+        else:
+            obs.set_scene_item_enabled(
+                scene_name='Seed Type',
+                item_id=item_id,
+                enabled=False
+            )
 
 
 def fetch_splits():
@@ -668,7 +855,7 @@ def fetch_splits():
         app.after(0, lambda exc=exc: info_label.configure(text="\n".join(info_lines[1:] + [str(exc)])))
     finally:
         if split_updating and generation == poll_generation:
-            app.after(UPDATE_INTERVAL_MS, fetch_splits)
+            app.after(2000, fetch_splits)
 
 
 def start_live_polling():
@@ -710,15 +897,88 @@ def set_show_heads():
     save_settings()
 
     for player in streamingplayerlist:
-        if player.get("element") is None:
-            continue
+        old = player["element"]
+        frame = player["frame"]
+
+        old.destroy()
 
         if show_heads:
             avatar = get_player_avatar(player)
-            player["element"].configure(image=avatar)
         else:
             player["avatar_image"] = None
-            player["element"].configure(image=None)
+            avatar = None
+
+        new = ctk.CTkButton(
+            frame,
+            text=old.cget("text"),
+            image=avatar,
+            width=220,
+            height=38,
+            command=lambda p=player: selectstream(p),
+        )
+        new.pack(padx=5, pady=3, fill="x")
+
+        player["element"] = new
+
+        show_heads_label.configure(text=f'{streamingplayerlist.index(player)}/{len(streamingplayerlist)}')
+    show_heads_label.configure(text='Done', text_color="green")
+
+auto_seed = False
+
+def set_auto_seed_advance():
+    global auto_seed
+    auto_seed = bool(auto_seed_switch.get())
+    settings['auto_seed'] = auto_seed
+    save_settings()
+    if auto_seed:
+        seeds_button.configure(state='normal')
+        seed_increment_button.configure(state='disabled')
+    else:
+        seeds_button.configure(state='disabled')
+        seed_increment_button.configure(state='normal')
+
+
+def manual_update_seed():
+    manual_seed_window = ctk.CTkToplevel(app)
+    manual_seed_window.grab_set()
+    manual_seed_window.title("Seed Menu")
+    manual_seed_window.geometry("220x100")
+
+    def _save():
+        for i in ["BT", "DT", "VILLAGE", "RP", "SHIP"]:
+            item_id = obs.get_scene_item_id(
+                scene_name='Seed Type',
+                source_name=i
+            ).scene_item_id
+            if i == seed_type.get():
+                obs.set_scene_item_enabled(
+                    scene_name='Seed Type',
+                    item_id=item_id,
+                    enabled=True
+                )
+            else:
+                obs.set_scene_item_enabled(
+                    scene_name='Seed Type',
+                    item_id=item_id,
+                    enabled=False
+                )
+
+        obs.set_input_settings('Seed', {'text': 'Seed ' + str(seed_number.get())}, True)
+
+    seed_label = ctk.CTkLabel(manual_seed_window, text='Seed #:')
+    seed_label.grid(row=0, column=0, padx=2, pady=2)
+    
+    seed_number = ctk.CTkEntry(manual_seed_window, validate="key", validatecommand=(validate_seed_count_cmd, "%P"))
+    seed_number.grid(row=0, column=1, padx=2, pady=2)
+
+    type_label = ctk.CTkLabel(manual_seed_window, text='Seed Type:')
+    type_label.grid(row=1, column=0, padx=2, pady=2)
+
+    seed_type = ctk.CTkOptionMenu(manual_seed_window, values=["BT", "DT", "VILLAGE", "RP", "SHIP"])
+    seed_type.grid(row=1, column=1, padx=2, pady=2)
+
+    save_button = ctk.CTkButton(manual_seed_window, text='Save', command=_save)
+    save_button.grid(row=2, column=0, columnspan=2, padx=2, pady=2)
 
 
 tabs = ctk.CTkTabview(app, command=tab_changed)
@@ -727,7 +987,7 @@ setup_tab = tabs.add("Setup")
 advanced_tab = tabs.add("Advanced Settings")
 streams_tab = tabs.add("Streams")
 
-d# region Setup tab
+# region Setup tab
 file_frame = ctk.CTkFrame(setup_tab)
 file_frame.pack(fill="x", padx=20, pady=2)
 file_label = ctk.CTkLabel(file_frame, text="Player File:")
@@ -823,14 +1083,23 @@ bot_label.pack(side="left", padx=10, pady=2)
 bot_entry = ctk.CTkEntry(bot_frame)
 bot_entry.pack(side="right", padx=10, pady=2)
 
-update_frame = ctk.CTkFrame(setup_tab)
-update_frame.pack(fill="x", padx=20, pady=2)
-update_label = ctk.CTkLabel(update_frame, text="Update OBS")
-update_label.pack(side="left", padx=10, pady=2)
-update_button = ctk.CTkButton(update_frame, text="Update", command=updateobs)
-update_button.pack(side="right", padx=10, pady=2)
-update_status_label = ctk.CTkLabel(update_frame, text="", text_color="gray")
-update_status_label.pack(side="right", padx=10, pady=2)
+seeds_frame = ctk.CTkFrame(setup_tab)
+seeds_frame.pack(fill='x', padx=20, pady=2)
+seeds_label = ctk.CTkLabel(seeds_frame, text="Automatic Seed Increment (end of match):")
+seeds_label.pack(side='left', padx=10, pady=2)
+seeds_button = ctk.CTkButton(seeds_frame, text="Open Seed Menu", command=open_seed_menu)
+seeds_button.pack(side='right', padx=10, pady=2)
+auto_seed_switch = ctk.CTkSwitch(seeds_frame, command=set_auto_seed_advance, text='')
+auto_seed_switch.pack(side="right", padx=10, pady=2)
+
+save_frame = ctk.CTkFrame(setup_tab)
+save_frame.pack(fill="x", padx=20, pady=2)
+save_label = ctk.CTkLabel(save_frame, text="Save / Update OBS")
+save_label.pack(side="left", padx=10, pady=2)
+save_button = ctk.CTkButton(save_frame, text="Save", command=savesetup)
+save_button.pack(side="right", padx=10, pady=2)
+save_status_label = ctk.CTkLabel(save_frame, text="", text_color="gray")
+save_status_label.pack(side="right", padx=10, pady=2)
 # endregion
 
 # region Advanced Settings Tab
@@ -841,7 +1110,23 @@ show_heads_label = ctk.CTkLabel(show_head_frame, text="Show Heads in app: (will 
 show_heads_label.pack(side="left", padx=10, pady=2)
 show_heads_switch = ctk.CTkSwitch(show_head_frame, command=set_show_heads, text='')
 show_heads_switch.pack(side="right", padx=10, pady=2)
-show_heads_switch.deselect()
+show_heads_label = ctk.CTkLabel(show_head_frame, text="", text_color="gray")
+show_heads_label.pack(side="right", padx=10, pady=2)
+
+chat_frame = ctk.CTkFrame(advanced_tab)
+chat_frame.pack(fill="x", padx=20, pady=2)
+chat_label = ctk.CTkLabel(chat_frame, text="Chat url:")
+chat_label.pack(side="left", padx=10, pady=2)
+chat_entry = ctk.CTkEntry(chat_frame, width=500)
+chat_entry.pack(side="right", padx=10, pady=2)
+
+inv_frame = ctk.CTkFrame(advanced_tab)
+inv_frame.pack(fill="x", padx=20, pady=2)
+inv_label = ctk.CTkLabel(inv_frame, text="Inventory Tracker file:")
+inv_label.pack(side="left", padx=10, pady=2)
+inv_entry = ctk.CTkEntry(inv_frame, width=500)
+inv_entry.pack(side="right", padx=10, pady=2)
+
 
 # endregion
 
@@ -856,7 +1141,7 @@ info_frame = ctk.CTkFrame(info_obs_frame)
 info_frame.pack(fill="x", padx=20, pady=5)
 info_title = ctk.CTkLabel(info_frame, text="Match Info", font=ctk.CTkFont(size=20))
 info_title.pack(fill="x", padx=5, pady=5)
-info_label = ctk.CTkLabel(info_frame, text="\n\n\n\n\n")
+info_label = ctk.CTkLabel(info_frame, text="\n\n\n\n")
 info_label.pack(fill="x", padx=5, pady=5)
 
 obs_input_frame = ctk.CTkFrame(info_obs_frame)
@@ -876,20 +1161,49 @@ view_3_button.pack(pady=5)
 view_4_button = ctk.CTkButton(right_view_frame, width=100, height=40, text="", command=lambda: selectspot(4, view_4_button))
 view_4_button.pack(pady=5)
 
-clear_button = ctk.CTkButton(info_obs_frame, text="Clear Selected", command=clear)
-clear_button.pack()
+buttons_frame = ctk.CTkFrame(info_obs_frame)
+buttons_frame.pack(fill="x", padx=20, pady=5)
+
+clear_button = ctk.CTkButton(buttons_frame, text="Clear Selected", command=clear)
+clear_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+
+refresh_button = ctk.CTkButton(buttons_frame, text="Refresh Selected", command=refresh)
+refresh_button.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+
+chat_inv_button = ctk.CTkButton(buttons_frame, text="Chat -> Inventory", command=chat_inv_toggle)
+chat_inv_button.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+
+seed_increment_button = ctk.CTkButton(buttons_frame, text="Update Seed", command=manual_update_seed)
+seed_increment_button.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
 # endregion
 
 seed_entry.set(1)
+
 if settings.get("obs_password"):
     obs_password_entry.set(str(settings.get("obs_password")))
+
 if settings.get("ranked_api_key"):
     api_entry.set(str(settings.get("ranked_api_key")))
+
 if settings.get("discord_token"):
     bot_entry.set(str(settings.get("discord_token")))
+
 if settings.get("ign"):
     ign_entry.set(str(settings.get("ign")))
+
+if settings.get("chat_url"):
+    chat_entry.set(str(settings.get("chat_url")))
+else:
+    chat_entry.set("https://chat.johnnycyan.com/v2/?channel=mcrankedleagues&size=2&emoteScale=1&font=0&height=3&voice=Brian&hide_colon=true&animate=true&readable=true&yt=mcrankedleagues")
+
+if settings.get("inv_file"):
+    inv_entry.set(str(settings.get("inv_file")))
+
+if settings.get('auto_seed', None) != None:
+    auto_seed_switch.set(settings.get('auto_seed'))
+    set_auto_seed_advance()
+
 show_heads = bool(settings.get("heads", False))
 show_heads_switch.set(show_heads)
 
@@ -903,12 +1217,10 @@ def shutdown():
     app.destroy()
 
 app.protocol("WM_DELETE_WINDOW", shutdown)
-app.after(100, connectobs)
+app.after(500, lambda: run_thread(connectobs))
 app.mainloop()
 
 
 ## Todo
-# - chat -> inv button
-# - set names of elements so obs doesnt have to be right
-# - set settings location to appdata
-# - seeds
+# - set names of elements so obs doesnt have to be right - might force my scenes
+# - intermission?
