@@ -1,5 +1,4 @@
-﻿from calendar import week
-import json
+﻿import json
 import re
 import threading
 from io import BytesIO
@@ -113,6 +112,7 @@ validate_number_cmd = app.register(validate_number)
 validate_seed_count_cmd = app.register(validate_seed_count)
 
 def safe_obs_set(source, payload):
+    global info_lines
     if obs is None:
         return False
     try:
@@ -120,9 +120,17 @@ def safe_obs_set(source, payload):
         return True
     except Exception as exc:
         if 'No source was found by the name' in str(exc):
-            save_status_label.configure(text=f"OBS error: Check scene collection and element names are correct", text_color="red")
+            if tabs.get() == 'Setup':
+                save_status_label.configure(text=f"OBS error: Check scene collection and element names are correct", text_color="red")
+            elif tabs.get() == 'Streams':
+                info_lines = info_lines[2:] + ['OBS error: Check scene collection'] + ['and element names are correct']
+                info_label.configure(text="\n".join(info_lines))
         else:
-            save_status_label.configure(text=f"OBS error: {exc}", text_color="red")
+            if tabs.get() == 'Setup':
+                save_status_label.configure(text=f"OBS error: {exc}", text_color="red")
+            elif tabs.get() == 'Streams':
+                info_lines = info_lines[2:] + ['OBS error: '] + [exc]
+                info_label.configure(text="\n".join(info_lines))
     return False
 
 
@@ -669,11 +677,11 @@ def chat_inv_toggle():
         app.after(2000, lambda: chat_inv_button.configure(text='Chat -> Inventory', fg_color='#1f6aa5'))
         return
     
-    obs.set_input_settings('items', {'url': settings.get('chat_url')}, True)
-    obs.set_input_settings('items', {'local_file': settings.get('inv_file')}, True)
+    safe_obs_set('items', {'url': settings.get('chat_url')})
+    safe_obs_set('items', {'local_file': settings.get('inv_file')})
 
     chat = obs.get_input_settings('items').input_settings.get('is_local_file', False)
-    obs.set_input_settings('items', {'is_local_file': not chat}, True)
+    safe_obs_set('items', {'is_local_file': not chat})
 
     if chat:
         chat_inv_button.configure(text='Chat -> Inventory', fg_color='#1f6aa5')
@@ -813,7 +821,7 @@ def update_splits_display(data):
 def update_seed():
     seed = int(seed_entry.get())
     _type = seed_entries[seed - 1]
-    obs.set_input_settings('Seed', {'text': 'Seed ' + str(seed)}, True)
+    safe_obs_set('Seed', {'text': 'Seed ' + str(seed)})
     for i in ["BT", "DT", "VILLAGE", "RP", "SHIP"]:
         item_id = obs.get_scene_item_id(
             scene_name='Seed Type',
@@ -963,7 +971,7 @@ def manual_update_seed():
                     enabled=False
                 )
 
-        obs.set_input_settings('Seed', {'text': 'Seed ' + str(seed_number.get())}, True)
+        safe_obs_set('Seed', {'text': 'Seed ' + str(seed_number.get())})
 
     seed_label = ctk.CTkLabel(manual_seed_window, text='Seed #:')
     seed_label.grid(row=0, column=0, padx=2, pady=2)
@@ -1195,7 +1203,7 @@ if settings.get("ign"):
 if settings.get("chat_url"):
     chat_entry.set(str(settings.get("chat_url")))
 else:
-    chat_entry.set("https://chat.johnnycyan.com/v2/?channel=mcrankedleagues&size=2&emoteScale=1&font=0&height=3&voice=Brian&hide_colon=true&animate=true&readable=true&yt=mcrankedleagues")
+    chat_entry.set("https://chat.johnnycyan.com/v2/?channel=mcrankedleagues&size=2&emoteScale=1&font=0&height=3&hide_colon=true&animate=true&readable=true&yt=mcrankedleagues")
 
 if settings.get("inv_file"):
     inv_entry.set(str(settings.get("inv_file")))
