@@ -183,8 +183,9 @@ def set_view_button_display(button, player):
     )
 
 
+player_count = 0
 def loadplayerfile():
-    global streamingplayerlist
+    global streamingplayerlist, player_count
 
     try:
         playerlist_path = filedialog.askopenfilename(
@@ -196,6 +197,8 @@ def loadplayerfile():
 
         with open(playerlist_path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
+
+        player_count = len(data)
 
         filename = Path(playerlist_path).name
         match = re.match(r"mcrl_(\d+)_(\d+)\.ranked$", filename)
@@ -268,7 +271,7 @@ def loadplayerfile():
             file_status_label.configure(text=f"{index}/{len(streamingplayerlist)} streamers loaded")
             app.update()
 
-        file_status_label.configure(text=f"Loaded {len(streamingplayerlist)} streamers", text_color="green")
+        file_status_label.configure(text=f"Loaded {len(streamingplayerlist)} streamers of {player_count} players", text_color="green")
         playerlistbutton.configure(fg_color="green", hover_color="dark green")
         savesetup()
     except Exception as exc:
@@ -352,6 +355,8 @@ def savesetup():
         safe_obs_set("Week", {"text": f"Week {week_entry.get()}", "font_size": 30})
         safe_obs_set("Seed", {"text": f"Seed {seed_entry.get()}", "font_size": 30})
 
+        safe_obs_set("numPlayers", {"text": "Players: " + str(player_count)})
+
         for source in ["Big Leaderboard", "MATCH WINNER", "lb"]:
             safe_obs_set(
                 source,
@@ -407,7 +412,8 @@ def circlify(url, name):
     result.save(filepath)
     return str(filepath)
 
-
+pcomm1 = ""
+pcomm2 = ""
 def commentators_thread():
     global pcomm1, pcomm2
 
@@ -453,6 +459,7 @@ def commentators_thread():
             app.after(0, lambda: comm2_name_entry.insert(0, name))
             safe_obs_set("commimg2", {"file": filepath})
     except Exception as exc:
+        error_message = str(exc)
         app.after(0, lambda: save_status_label.configure(text=str(exc), text_color="red"))
 
 seed_count = 5
@@ -958,16 +965,31 @@ def manual_update_seed():
                 scene_name='Seed Type',
                 source_name=i
             ).scene_item_id
+            img_item_id = obs.get_scene_item_id(
+                scene_name='Seed Type',
+                source_name=i + " img"
+            ).scene_item_id
             if i == seed_type.get():
                 obs.set_scene_item_enabled(
                     scene_name='Seed Type',
                     item_id=item_id,
                     enabled=True
                 )
+                obs.set_scene_item_enabled(
+                    scene_name='Seed Type',
+                    item_id=img_item_id,
+                    enabled=True
+                )
             else:
                 obs.set_scene_item_enabled(
                     scene_name='Seed Type',
                     item_id=item_id,
+                    enabled=False
+                )
+
+                obs.set_scene_item_enabled(
+                    scene_name='Seed Type',
+                    item_id=img_item_id,
                     enabled=False
                 )
 
