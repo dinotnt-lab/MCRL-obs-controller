@@ -965,16 +965,31 @@ def manual_update_seed():
                 scene_name='Seed Type',
                 source_name=i
             ).scene_item_id
+            img_item_id = obs.get_scene_item_id(
+                scene_name='Seed Type',
+                source_name=i + " img"
+            ).scene_item_id
             if i == seed_type.get():
                 obs.set_scene_item_enabled(
                     scene_name='Seed Type',
                     item_id=item_id,
                     enabled=True
                 )
+                obs.set_scene_item_enabled(
+                    scene_name='Seed Type',
+                    item_id=img_item_id,
+                    enabled=True
+                )
             else:
                 obs.set_scene_item_enabled(
                     scene_name='Seed Type',
                     item_id=item_id,
+                    enabled=False
+                )
+
+                obs.set_scene_item_enabled(
+                    scene_name='Seed Type',
+                    item_id=img_item_id,
                     enabled=False
                 )
 
