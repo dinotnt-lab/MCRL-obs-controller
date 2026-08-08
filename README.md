@@ -58,6 +58,11 @@ If any number of elements have the same name, they are already linked.
 ---
  - MATCH WINNER
     - Browser source for match by match winners
+      
+### INTERMISSION
+---
+ - numPlayers
+    - Text element for player count
 
 ## Todos
 auto player count  
