@@ -412,7 +412,8 @@ def circlify(url, name):
     result.save(filepath)
     return str(filepath)
 
-
+pcomm1 = ""
+pcomm2 = ""
 def commentators_thread():
     global pcomm1, pcomm2
 
@@ -458,6 +459,7 @@ def commentators_thread():
             app.after(0, lambda: comm2_name_entry.insert(0, name))
             safe_obs_set("commimg2", {"file": filepath})
     except Exception as exc:
+        error_message = str(exc)
         app.after(0, lambda: save_status_label.configure(text=str(exc), text_color="red"))
 
 seed_count = 5
